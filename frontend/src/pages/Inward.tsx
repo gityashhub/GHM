@@ -848,8 +848,8 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
       return;
     }
 
-    // Validate rate if provided
-    if (formData.rate && !isPositiveNumber(formData.rate)) {
+    // Validate rate if provided and user is admin
+    if (user?.role === 'admin' && formData.rate && !isPositiveNumber(formData.rate)) {
       toast.error("Rate must be a positive number");
       return;
     }
