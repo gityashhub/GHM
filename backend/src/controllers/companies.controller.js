@@ -23,9 +23,21 @@ class CompaniesController {
         sortOrder,
       });
 
+      // Filter out material rates for non-admin users
+      let companies = result.companies;
+      if (req.user && req.user.role !== 'admin') {
+        companies = companies.map(company => ({
+          ...company,
+          materials: company.materials ? company.materials.map(material => {
+            const { rate, ...materialWithoutRate } = material;
+            return materialWithoutRate;
+          }) : []
+        }));
+      }
+
       res.status(200).json({
         success: true,
-        data: result.companies,
+        data: companies,
         pagination: result.pagination,
         message: 'Companies retrieved successfully',
       });
@@ -41,7 +53,18 @@ class CompaniesController {
   async getCompanyById(req, res, next) {
     try {
       const { id } = req.params;
-      const company = await companiesService.getCompanyById(id);
+      let company = await companiesService.getCompanyById(id);
+
+      // Filter out material rates for non-admin users
+      if (req.user && req.user.role !== 'admin') {
+        company = {
+          ...company,
+          materials: company.materials ? company.materials.map(material => {
+            const { rate, ...materialWithoutRate } = material;
+            return materialWithoutRate;
+          }) : []
+        };
+      }
 
       res.status(200).json({
         success: true,
@@ -123,7 +146,15 @@ class CompaniesController {
   async getCompanyMaterials(req, res, next) {
     try {
       const { id } = req.params;
-      const materials = await companiesService.getCompanyMaterials(id);
+      let materials = await companiesService.getCompanyMaterials(id);
+
+      // Filter out material rates for non-admin users
+      if (req.user && req.user.role !== 'admin') {
+        materials = materials.map(material => {
+          const { rate, ...materialWithoutRate } = material;
+          return materialWithoutRate;
+        });
+      }
 
       res.status(200).json({
         success: true,

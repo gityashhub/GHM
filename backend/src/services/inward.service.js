@@ -196,13 +196,25 @@ class InwardService {
       throw new ValidationError('Date, company, manifest number, waste name, quantity, and unit are required');
     }
 
-    // Check if company exists
+    // Check if company exists and get materials
     const company = await prisma.company.findUnique({
       where: { id: companyId },
+      include: {
+        materials: true,
+      },
     });
 
     if (!company) {
       throw new NotFoundError('Company');
+    }
+
+    // Auto-populate rate from company material if not provided
+    let finalRate = rate;
+    if (!finalRate || finalRate === null || finalRate === undefined) {
+      const material = company.materials.find(m => m.materialName === wasteName);
+      if (material && material.rate) {
+        finalRate = material.rate;
+      }
     }
 
     // Generate sr_no if not provided
@@ -232,7 +244,7 @@ class InwardService {
         manifestNo: manifestNo.trim(),
         vehicleNo: vehicleNo?.trim() || null,
         wasteName: wasteName.trim(),
-        rate: rate ? parseFloat(rate) : null,
+        rate: finalRate ? parseFloat(finalRate) : null,
         category: category?.trim() || null,
         quantity: parseFloat(quantity),
         unit: unit.trim(),
