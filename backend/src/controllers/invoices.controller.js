@@ -165,7 +165,8 @@ class InvoicesController {
    */
   async getStats(req, res, next) {
     try {
-      const stats = await invoicesService.getStats();
+      const { type } = req.query;
+      const stats = await invoicesService.getStats({ type });
 
       res.json({
         success: true,

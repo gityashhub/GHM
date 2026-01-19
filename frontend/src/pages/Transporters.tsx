@@ -224,7 +224,7 @@ export default function Transporters() {
       header: "GST Number",
       render: (transporter: Transporter) => transporter.gstNumber || "—",
     },
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       {
         key: "totalInvoiced",
         header: "Total Invoiced",
@@ -272,31 +272,35 @@ export default function Transporters() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setEditingTransporter(transporter);
-              setFormData({
-                transporterId: transporter.transporterId,
-                name: transporter.name,
-                contact: transporter.contact || "",
-                address: transporter.address || "",
-                email: transporter.email || "",
-                gstNumber: transporter.gstNumber || "",
-              });
-              setIsModalOpen(true);
-            }}
-            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            title="Edit"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(transporter.id)}
-            disabled={deleteMutation.isPending}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {user?.role !== 'admin' && (
+            <>
+              <button
+                onClick={() => {
+                  setEditingTransporter(transporter);
+                  setFormData({
+                    transporterId: transporter.transporterId,
+                    name: transporter.name,
+                    contact: transporter.contact || "",
+                    address: transporter.address || "",
+                    email: transporter.email || "",
+                    gstNumber: transporter.gstNumber || "",
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Edit"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDelete(transporter.id)}
+                disabled={deleteMutation.isPending}
+                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -343,13 +347,15 @@ export default function Transporters() {
             </div>
           </div>
         </div>
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="h-[68px] px-6 flex items-center gap-2 w-full md:w-auto justify-center"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Transporter</span>
-        </Button>
+        {user?.role !== 'admin' && (
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            className="h-[68px] px-6 flex items-center gap-2 w-full md:w-auto justify-center"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Transporter</span>
+          </Button>
+        )}
       </div>
 
 
@@ -359,7 +365,7 @@ export default function Transporters() {
           <p className="text-sm text-muted-foreground">Total Transporters</p>
           <p className="text-2xl font-bold text-foreground mt-1">{pagination.total}</p>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Invoiced</p>
@@ -558,7 +564,7 @@ function TransporterDetails({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="glass-card p-4">
             <p className="text-sm text-muted-foreground">Total Invoiced</p>
@@ -591,7 +597,7 @@ function TransporterDetails({ id }: { id: string }) {
               { key: "manifestNo", header: "Manifest No.", render: (m: any) => m.manifestNo || '-' },
               { key: "wasteName", header: "Waste Name", render: (m: any) => m.wasteName || '-' },
               { key: "quantity", header: "Quantity", render: (m: any) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
-              ...(user?.role === 'admin' ? [
+              ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                 { key: "invoiceNo", header: "Invoice No.", render: (m: any) => m.invoiceNo || '-' },
                 { key: "rate", header: "Rate", render: (m: any) => m.rate ? `₹${Number(m.rate).toFixed(2)}` : '-' },
                 { key: "grossAmount", header: "Gross Amount", render: (m: any) => m.grossAmount ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
@@ -612,7 +618,7 @@ function TransporterDetails({ id }: { id: string }) {
               { key: "month", header: "Month", render: (m: any) => m.month || m.outwardEntry?.month || '-' },
               { key: "manifestNo", header: "Manifest No.", render: (m: any) => m.manifestNo || '-' },
               { key: "wasteName", header: "Waste Name", render: (m: any) => m.wasteName || '-' },
-              ...(user?.role === 'admin' ? [
+              ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                 { key: "invoiceNo", header: "Invoice No.", render: (m: any) => m.invoiceNo || '-' },
                 { key: "grossAmount", header: "Gross Amount", render: (m: any) => m.grossAmount ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
                 { key: "paidOn", header: "Paid On", render: (m: any) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : <span className="text-destructive font-medium">Pending</span> },
@@ -652,7 +658,7 @@ function TransporterDetails({ id }: { id: string }) {
       </div>
 
       {/* Invoice History */}
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <div>
           <h4 className="text-sm font-medium text-foreground mb-3">Invoice History</h4>
           <div className="overflow-x-auto rounded-xl border border-border shadow-sm">

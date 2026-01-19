@@ -31,24 +31,9 @@ export interface RevenueChartData {
 }
 
 export interface PaymentStatus {
-  paid: {
-    amount: number;
-    count: number;
-  };
-  pending: {
-    amount: number;
-    count: number;
-  };
-  partial: {
-    amount: number;
-    paid: number;
-    pending: number;
-    count: number;
-  };
-  overdue: {
-    amount: number;
-    count: number;
-  };
+  total: number;
+  received: number;
+  pending: number;
 }
 
 export interface RecentActivity {

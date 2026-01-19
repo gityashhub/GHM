@@ -294,17 +294,17 @@ export default function Outward() {
     { key: "wasteName", header: "Waste Name", render: (e: OutwardEntry) => e.wasteName || '-' },
     { key: "quantity", header: "Quantity", render: (e: OutwardEntry) => `${e.quantity} ${e.unit}` },
     { key: "vehicleCapacity", header: "Vehicle Capacity", render: (e: OutwardEntry) => e.vehicleCapacity || '-' },
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       { key: "rate", header: "Rate", render: (e: OutwardEntry) => e.rate ? `₹${Number(e.rate).toFixed(2)}` : '-' },
       { key: "amount", header: "Amount", render: (e: OutwardEntry) => e.amount ? `₹${Number(e.amount).toFixed(2)}` : '-' },
       { key: "gst", header: "GST", render: (e: OutwardEntry) => e.gst ? `₹${Number(e.gst).toFixed(2)}` : '-' },
       { key: "grossAmount", header: "Gross Amount", render: (e: OutwardEntry) => e.invoice?.grandTotal ? `₹${Number(e.invoice.grandTotal).toLocaleString()}` : e.grossAmount ? `₹${Number(e.grossAmount).toLocaleString()}` : "-" },
     ] : []),
     { key: "packing", header: "Packing", render: (e: OutwardEntry) => e.packing || '-' },
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       { key: "invoiceNo", header: "Invoice No.", render: (e: OutwardEntry) => e.invoice?.invoiceNo || "-" },
     ] : []),
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       { key: "dueOn", header: "Due On", render: (e: OutwardEntry) => e.dueOn ? format(new Date(e.dueOn), 'dd MMM yyyy') : "-" },
       { key: "paidOn", header: "Paid On", render: (e: OutwardEntry) => e.paidOn ? format(new Date(e.paidOn), 'dd MMM yyyy') : "-" },
     ] : []),
@@ -320,25 +320,29 @@ export default function Outward() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setEditingEntry(e);
-              setIsEditModalOpen(true);
-            }}
-            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            title="Edit Entry"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
+          {user?.role !== 'admin' && (
+            <>
+              <button
+                onClick={() => {
+                  setEditingEntry(e);
+                  setIsEditModalOpen(true);
+                }}
+                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Edit Entry"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
 
-          <button
-            onClick={() => handleDelete(e.id)}
-            disabled={deleteMutation.isPending}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+              <button
+                onClick={() => handleDelete(e.id)}
+                disabled={deleteMutation.isPending}
+                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -516,7 +520,7 @@ export default function Outward() {
                         { key: 'wasteName', header: 'Waste Name' },
                         { key: 'quantity', header: 'Quantity' },
                         { key: 'unit', header: 'Unit' },
-                        ...(user?.role === 'admin' ? [
+                        ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                           { key: 'rate', header: 'Rate' },
                           { key: 'amount', header: 'Amount' },
                           { key: 'detCharges', header: 'Det Charges' },
@@ -572,9 +576,11 @@ export default function Outward() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
-              <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Create Outward Entry</span>
-            </button>
+            {user?.role !== 'admin' && (
+              <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
+                <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Create Outward Entry</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -590,7 +596,7 @@ export default function Outward() {
           <p className="text-sm text-muted-foreground">Total Quantity</p>
           <p className="text-xl md:text-2xl font-bold text-foreground mt-1">{stats.totalQuantity.toFixed(1)}</p>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Invoiced</p>
@@ -623,12 +629,14 @@ export default function Outward() {
             <h2 className="text-xl font-semibold text-foreground">Outward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments for outward/dispatch</p>
           </div>
-          <Button onClick={() => {
-            setEditingMaterial(null);
-            setIsMaterialModalOpen(true);
-          }}>
-            <Plus className="w-4 h-4 mr-2" /> Add Material Record
-          </Button>
+          {user?.role !== 'admin' && (
+            <Button onClick={() => {
+              setEditingMaterial(null);
+              setIsMaterialModalOpen(true);
+            }}>
+              <Plus className="w-4 h-4 mr-2" /> Add Material Record
+            </Button>
+          )}
         </div>
 
         <DataTable
@@ -640,7 +648,7 @@ export default function Outward() {
             { key: "vehicleNo", header: "Vehicle No.", render: (m: OutwardMaterial) => m.vehicleNo || '-' },
             { key: "wasteName", header: "Waste Name", render: (m: OutwardMaterial) => m.wasteName || '-' },
             { key: "quantity", header: "Quantity", render: (m: OutwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
-            ...(user?.role === 'admin' ? [
+            ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
               { key: "rate", header: "Rate", render: (m: OutwardMaterial) => m.rate ? `₹${Number(m.rate).toFixed(2)}` : '-' },
               { key: "amount", header: "Amount", render: (m: OutwardMaterial) => m.amount ? `₹${Number(m.amount).toFixed(2)}` : '-' },
               { key: "detCharges", header: "Det. Charges", render: (m: OutwardMaterial) => m.detCharges ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
@@ -654,24 +662,28 @@ export default function Outward() {
               header: "Actions",
               render: (m: OutwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingMaterial(m);
-                      setIsMaterialModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteMaterial(m.id)}
-                    disabled={deleteMaterialMutation.isPending}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {user?.role !== 'admin' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingMaterial(m);
+                          setIsMaterialModalOpen(true);
+                        }}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMaterial(m.id)}
+                        disabled={deleteMaterialMutation.isPending}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               ),
             },
@@ -928,7 +940,7 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Invoice No.</label>
             <input
@@ -1001,7 +1013,7 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
         </div>
       </div>
 
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Rate</label>
@@ -1058,7 +1070,7 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
         </div>
       </div>
 
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Due On</label>
@@ -1158,10 +1170,60 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
         </div>
       </div>
 
-      {user?.role === 'admin' && entry.invoice && (
+      {/* Linked Transporter Records */}
+      <div className="pt-4 border-t border-border">
+        <h4 className="font-medium text-foreground mb-3">Transporter Records</h4>
+        {entry.outwardMaterials && entry.outwardMaterials.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2 font-semibold">Transporter</th>
+                  <th className="px-4 py-2 font-semibold text-right">Quantity</th>
+                  {['admin', 'superadmin'].includes(user?.role || '') && (
+                    <>
+                      <th className="px-4 py-2 font-semibold text-right">Rate</th>
+                      <th className="px-4 py-2 font-semibold text-right">Gross Amount</th>
+                      <th className="px-4 py-2 font-semibold">Invoice No</th>
+                      <th className="px-4 py-2 font-semibold">Paid On</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {entry.outwardMaterials.map((mat: any) => (
+                  <tr key={mat.id} className="hover:bg-secondary/20 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground">{mat.transporterName}</div>
+                      <div className="text-xs text-muted-foreground">{mat.vehicleNo || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right">{mat.quantity} {mat.unit}</td>
+                    {['admin', 'superadmin'].includes(user?.role || '') && (
+                      <>
+                        <td className="px-4 py-3 text-right">₹{Number(mat.rate || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-medium">₹{Number(mat.grossAmount || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3">{mat.invoiceNo || '-'}</td>
+                        <td className="px-4 py-3">
+                          {mat.paidOn ? format(new Date(mat.paidOn), 'dd MMM yyyy') : <span className="text-destructive font-medium">Pending</span>}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic bg-secondary/20 p-4 rounded-xl text-center">
+            No linked transporter records found for this dispatch.
+          </p>
+        )}
+      </div>
+
+      {['admin', 'superadmin'].includes(user?.role || '') && entry.invoice && (
         <>
           <hr className="border-border" />
-          <h4 className="font-medium text-foreground">Invoice Details</h4>
+          <h4 className="font-medium text-foreground">Cement Company Invoice Details</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Invoice No.</p>

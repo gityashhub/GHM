@@ -234,13 +234,15 @@ class TransportersService {
 
     if (!transporter) return { totalInvoiced: 0, totalPaid: 0, totalPending: 0 };
 
-    // 1. Get all Outward Entries for this transporter (ID match)
-    const outwardEntries = await prisma.outwardEntry.findMany({
-      where: { transporterId },
+    // 1. Get formal Transporter Invoices
+    const transporterInvoices = await prisma.invoice.findMany({
+      where: {
+        transporterId,
+        type: 'Transporter'
+      },
       select: {
-        grossAmount: true,
-        amount: true,
-        paidOn: true,
+        grandTotal: true,
+        paymentReceived: true,
       },
     });
 
@@ -264,14 +266,15 @@ class TransportersService {
       },
     });
 
-    // Sum up Outward Entries
-    const entriesInvoiced = outwardEntries.reduce(
-      (sum, entry) => sum + Number(entry.grossAmount || entry.amount || 0),
+    // Sum up Formal Invoices
+    const formalInvoiced = transporterInvoices.reduce(
+      (sum, inv) => sum + Number(inv.grandTotal || 0),
       0
     );
-    const entriesPaid = outwardEntries
-      .filter((entry) => entry.paidOn)
-      .reduce((sum, entry) => sum + Number(entry.grossAmount || entry.amount || 0), 0);
+    const formalPaid = transporterInvoices.reduce(
+      (sum, inv) => sum + Number(inv.paymentReceived || 0),
+      0
+    );
 
     // Sum up Inward Materials
     const inwardInvoiced = inwardMaterials.reduce(
@@ -291,8 +294,8 @@ class TransportersService {
       .filter((mat) => mat.paidOn)
       .reduce((sum, mat) => sum + Number(mat.grossAmount || mat.amount || 0), 0);
 
-    const totalInvoiced = entriesInvoiced + inwardInvoiced + outwardInvoiced;
-    const totalPaid = entriesPaid + inwardPaid + outwardPaid;
+    const totalInvoiced = formalInvoiced + inwardInvoiced + outwardInvoiced;
+    const totalPaid = formalPaid + inwardPaid + outwardPaid;
     const totalPending = Math.max(0, totalInvoiced - totalPaid);
 
     return {

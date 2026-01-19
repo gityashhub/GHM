@@ -42,6 +42,8 @@ class OutwardService {
           { manifestNo: { contains: search, mode: 'insensitive' } },
           { vehicleNo: { contains: search, mode: 'insensitive' } },
           { wasteName: { contains: search, mode: 'insensitive' } },
+          { cementCompany: { contains: search, mode: 'insensitive' } },
+          { transporter: { name: { contains: search, mode: 'insensitive' } } },
         ]
       });
     }

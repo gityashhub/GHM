@@ -214,7 +214,7 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Invoice No.</label>
             <input
@@ -236,7 +236,7 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
         </div>
       </div>
 
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>

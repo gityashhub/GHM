@@ -1,6 +1,7 @@
 import express from 'express';
 import companiesController from '../controllers/companies.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { authorize } from '../middleware/role.middleware.js';
 import {
   validate,
   createCompanySchema,
@@ -29,6 +30,7 @@ router.get('/:id', authenticate, companiesController.getCompanyById.bind(compani
 router.post(
   '/',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(createCompanySchema),
   companiesController.createCompany.bind(companiesController)
 );
@@ -37,12 +39,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(updateCompanySchema),
   companiesController.updateCompany.bind(companiesController)
 );
 
 // Delete company
-router.delete('/:id', authenticate, companiesController.deleteCompany.bind(companiesController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), companiesController.deleteCompany.bind(companiesController));
 
 // Get company materials
 router.get('/:id/materials', authenticate, companiesController.getCompanyMaterials.bind(companiesController));
@@ -51,6 +54,7 @@ router.get('/:id/materials', authenticate, companiesController.getCompanyMateria
 router.post(
   '/:id/materials',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(addMaterialSchema),
   companiesController.addMaterial.bind(companiesController)
 );
@@ -59,6 +63,7 @@ router.post(
 router.put(
   '/:id/materials/:materialId',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(updateMaterialSchema),
   companiesController.updateMaterial.bind(companiesController)
 );
@@ -67,6 +72,7 @@ router.put(
 router.delete(
   '/:id/materials/:materialId',
   authenticate,
+  authorize(['superadmin', 'employee']),
   companiesController.removeMaterial.bind(companiesController)
 );
 

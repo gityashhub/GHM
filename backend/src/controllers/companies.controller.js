@@ -1,5 +1,6 @@
 import companiesService from '../services/companies.service.js';
 import { logger } from '../utils/logger.js';
+import { sanitizeCompany, sanitizeCompanies, sanitizeMaterial } from '../utils/sanitize.js';
 
 /**
  * Companies Controller
@@ -23,17 +24,8 @@ class CompaniesController {
         sortOrder,
       });
 
-      // Filter out material rates for non-admin users
-      let companies = result.companies;
-      if (req.user && req.user.role !== 'admin') {
-        companies = companies.map(company => ({
-          ...company,
-          materials: company.materials ? company.materials.map(material => {
-            const { rate, ...materialWithoutRate } = material;
-            return materialWithoutRate;
-          }) : []
-        }));
-      }
+      // Sanitize data based on user role
+      const companies = sanitizeCompanies(result.companies, req.user?.role);
 
       res.status(200).json({
         success: true,
@@ -53,18 +45,10 @@ class CompaniesController {
   async getCompanyById(req, res, next) {
     try {
       const { id } = req.params;
-      let company = await companiesService.getCompanyById(id);
+      const companyRaw = await companiesService.getCompanyById(id);
 
-      // Filter out material rates for non-admin users
-      if (req.user && req.user.role !== 'admin') {
-        company = {
-          ...company,
-          materials: company.materials ? company.materials.map(material => {
-            const { rate, ...materialWithoutRate } = material;
-            return materialWithoutRate;
-          }) : []
-        };
-      }
+      // Sanitize data based on user role
+      const company = sanitizeCompany(companyRaw, req.user?.role);
 
       res.status(200).json({
         success: true,
@@ -126,7 +110,7 @@ class CompaniesController {
   async deleteCompany(req, res, next) {
     try {
       const { id } = req.params;
-      await companiesService.deleteCompany(id);
+      const result = await companiesService.deleteCompany(id);
 
       logger.info(`Company deleted: ${id}`);
 
@@ -146,15 +130,12 @@ class CompaniesController {
   async getCompanyMaterials(req, res, next) {
     try {
       const { id } = req.params;
-      let materials = await companiesService.getCompanyMaterials(id);
+      const materialsRaw = await companiesService.getCompanyMaterials(id);
 
-      // Filter out material rates for non-admin users
-      if (req.user && req.user.role !== 'admin') {
-        materials = materials.map(material => {
-          const { rate, ...materialWithoutRate } = material;
-          return materialWithoutRate;
-        });
-      }
+      // Sanitize data based on user role
+      const materials = materialsRaw.map(material =>
+        sanitizeMaterial(material, req.user?.role)
+      );
 
       res.status(200).json({
         success: true,

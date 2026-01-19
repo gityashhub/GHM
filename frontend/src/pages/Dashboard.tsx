@@ -31,7 +31,7 @@ const quickNavItems = [
   { title: "Inward Entry", description: "Record waste collection", icon: ArrowDownToLine, href: "/inward" },
   { title: "Outward Entry", description: "Record waste dispatch", icon: ArrowUpFromLine, href: "/outward" },
   { title: "Companies", description: "Manage generators", icon: Building2, href: "/companies" },
-  { title: "Invoices", description: "View all invoices", icon: FileText, href: "/invoices" },
+  { title: "Inward Invoices", description: "View inward invoices", icon: FileText, href: "/invoices" },
 ];
 
 const COLORS = {
@@ -92,29 +92,15 @@ export default function Dashboard() {
   const paymentStatusChartData = paymentStatus
     ? [
       {
-        name: "Paid",
-        value: paymentStatus.paid.amount,
+        name: "Received",
+        value: paymentStatus.received,
         color: COLORS.paid,
       },
       {
         name: "Pending",
-        value: paymentStatus.pending.amount,
+        value: paymentStatus.pending,
         color: COLORS.pending,
       },
-      {
-        name: "Partial",
-        value: paymentStatus.partial.pending,
-        color: COLORS.partial,
-      },
-      ...(paymentStatus.overdue.amount > 0
-        ? [
-          {
-            name: "Overdue",
-            value: paymentStatus.overdue.amount,
-            color: COLORS.overdue,
-          },
-        ]
-        : []),
     ].filter((item) => item.value > 0)
     : [];
 
@@ -147,13 +133,13 @@ export default function Dashboard() {
           icon={ArrowUpFromLine}
         />
         <StatCard
-          title="Total Invoices"
+          title="Inward Invoices"
           value={stats?.invoices.thisMonth.toString() || "0"}
           subtitle="Generated this month"
           icon={FileText}
         />
         <StatCard
-          title="Total Revenue (YTD)"
+          title="Total Inward Revenue (Month)"
           value={stats ? formatRevenue(stats.revenue.ytd) : "₹0"}
           subtitle={`Paid: ${stats ? formatRevenue(stats.revenue.paid) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue.pending) : "₹0"}`}
           icon={DollarSign}
@@ -223,10 +209,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Payment Status */}
+        {/* Payment Data (Monthly) */}
         <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Payment Status</h3>
-          {paymentStatusChartData.length > 0 ? (
+          <h3 className="text-lg font-semibold text-foreground mb-4">Payment Data (Current Month)</h3>
+          {paymentStatus ? (
             <>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
@@ -256,7 +242,11 @@ export default function Dashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-2 mt-4">
+              <div className="space-y-3 mt-4">
+                <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
+                  <span className="text-muted-foreground">Total Invoiced</span>
+                  <span className="font-bold text-foreground">{formatRevenue(paymentStatus.total)}</span>
+                </div>
                 {paymentStatusChartData.map((item) => (
                   <div key={item.name} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
@@ -340,7 +330,7 @@ export default function Dashboard() {
 
       {/* Revenue Chart */}
       <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Revenue</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">Monthly Inward Revenue</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={revenueData || []}>

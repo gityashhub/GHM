@@ -804,9 +804,16 @@ class InvoicesService {
 
   /**
    * Get invoice statistics
+   * @param {object} filter - Optional filter options
    * @returns {Promise<object>} Statistics
    */
-  async getStats() {
+  async getStats(filter = {}) {
+    const { type } = filter;
+    const where = {};
+    if (type) {
+      where.type = type;
+    }
+
     const [
       totalInvoices,
       totalInvoiced,
@@ -814,14 +821,17 @@ class InvoicesService {
       byType,
       byStatus,
     ] = await Promise.all([
-      prisma.invoice.count(),
+      prisma.invoice.count({ where }),
       prisma.invoice.aggregate({
+        where,
         _sum: { grandTotal: true },
       }),
       prisma.invoice.aggregate({
+        where,
         _sum: { paymentReceived: true },
       }),
       prisma.invoice.groupBy({
+        where,
         by: ['type'],
         _sum: {
           grandTotal: true,
@@ -830,6 +840,7 @@ class InvoicesService {
         _count: true,
       }),
       prisma.invoice.groupBy({
+        where,
         by: ['status'],
         _sum: {
           grandTotal: true,

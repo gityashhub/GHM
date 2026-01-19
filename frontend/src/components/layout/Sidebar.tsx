@@ -17,13 +17,13 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ['admin'] },
-  { icon: Building2, label: "Companies", path: "/companies", roles: ['admin', 'employee'] },
-  { icon: ArrowDownToLine, label: "Inward", path: "/inward", roles: ['admin', 'employee'] },
-  { icon: ArrowUpFromLine, label: "Outward", path: "/outward", roles: ['admin', 'employee'] },
-  { icon: Truck, label: "Transporters", path: "/transporters", roles: ['admin', 'employee'] },
-  { icon: FileText, label: "Invoices", path: "/invoices", roles: ['admin'] },
-  { icon: Settings, label: "Settings", path: "/settings", roles: ['admin'] },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ['admin', 'superadmin'] },
+  { icon: Building2, label: "Companies", path: "/companies", roles: ['admin', 'employee', 'superadmin'] },
+  { icon: ArrowDownToLine, label: "Inward", path: "/inward", roles: ['admin', 'employee', 'superadmin'] },
+  { icon: ArrowUpFromLine, label: "Outward", path: "/outward", roles: ['admin', 'employee', 'superadmin'] },
+  { icon: Truck, label: "Transporters", path: "/transporters", roles: ['admin', 'employee', 'superadmin'] },
+  { icon: FileText, label: "Invoices", path: "/invoices", roles: ['admin', 'superadmin'] },
+  { icon: Settings, label: "Settings", path: "/settings", roles: ['admin', 'superadmin'] },
 ];
 
 interface SidebarProps {

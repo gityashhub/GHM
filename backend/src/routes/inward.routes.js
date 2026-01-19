@@ -1,6 +1,7 @@
 import express from 'express';
 import inwardController from '../controllers/inward.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { authorize } from '../middleware/role.middleware.js';
 import { validate, createInwardEntrySchema, updateInwardEntrySchema } from '../utils/validators.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/:id', authenticate, inwardController.getEntryById.bind(inwardContro
 router.post(
   '/',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(createInwardEntrySchema),
   inwardController.createEntry.bind(inwardController)
 );
@@ -28,15 +30,16 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(updateInwardEntrySchema),
   inwardController.updateEntry.bind(inwardController)
 );
 
 // Delete inward entry
-router.delete('/:id', authenticate, inwardController.deleteEntry.bind(inwardController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), inwardController.deleteEntry.bind(inwardController));
 
 // Update payment
-router.put('/:id/payment', authenticate, inwardController.updatePayment.bind(inwardController));
+router.put('/:id/payment', authenticate, authorize(['superadmin', 'employee']), inwardController.updatePayment.bind(inwardController));
 
 // Get statistics
 router.get('/stats/all', authenticate, inwardController.getStats.bind(inwardController));

@@ -60,9 +60,11 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Append mode state
-  const [existingInvoice, setExistingInvoice] = useState<Invoice | null>(null);
+  const [existingInvoices, setExistingInvoices] = useState<Invoice[]>([]);
+  const [selectedExistingInvoiceId, setSelectedExistingInvoiceId] = useState<string | null>(null);
+  const [showAppendSelection, setShowAppendSelection] = useState(false);
   const [isAppendMode, setIsAppendMode] = useState(false);
-  const [showAppendAlert, setShowAppendAlert] = useState(false);
+  const [existingInvoice, setExistingInvoice] = useState<Invoice | null>(null); // To store the fully fetched invoice for append
 
   // Fetch companies (for Inward invoices)
   const { data: companiesData } = useQuery({
@@ -106,27 +108,27 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
   useEffect(() => {
     let isActive = true;
 
-    const checkExistingInvoice = async () => {
+    const checkExistingInvoices = async () => {
       // Reset state immediately when company changes
+      setExistingInvoices([]);
+      setSelectedExistingInvoiceId(null);
       setExistingInvoice(null);
-      setShowAppendAlert(false);
+      setShowAppendSelection(false);
       setIsAppendMode(false);
 
       if (type === 'Inward' && formData.companyId) {
         try {
-          // Fetch the most recent invoice for this company, regardless of status
-          // This allows appending to Paid, Partial, or Pending invoices
+          // Fetch existing invoices for this company
           const { invoices } = await invoicesService.getInvoices({
             companyId: formData.companyId,
             type: 'Inward',
-            limit: 1, // We only need one to append to
+            limit: 20, // Fetch more to give options
             sortOrder: 'desc',
           });
 
           if (isActive && invoices.length > 0) {
-            setExistingInvoice(invoices[0]);
-            setShowAppendAlert(true);
-            // isAppendMode remains false until user clicks "Append"
+            setExistingInvoices(invoices);
+            setShowAppendSelection(true);
           }
         } catch (error) {
           console.error("Failed to check existing invoices", error);
@@ -134,7 +136,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
       }
     };
 
-    checkExistingInvoice();
+    checkExistingInvoices();
 
     return () => {
       isActive = false;
@@ -206,15 +208,18 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
   const inwardEntries = inwardEntriesData?.entries || [];
   const outwardEntries = outwardEntriesData?.entries || [];
 
-  const handleAppendConfirm = async () => {
-    if (!existingInvoice) return;
+  const handleAppendConfirm = async (invoiceIdToAppend: string) => {
+    if (!invoiceIdToAppend) return;
 
     setIsAppendMode(true);
-    setShowAppendAlert(false);
+    // Don't hide selection, just update UI state to reflect mode (or we can hide it)
+    // Actually, locking the selection is better.
+    setShowAppendSelection(false);
 
     // Fetch full details of existing invoice to get current materials
     try {
-      const fullInvoice = await invoicesService.getInvoiceById(existingInvoice.id);
+      const fullInvoice = await invoicesService.getInvoiceById(invoiceIdToAppend);
+      setExistingInvoice(fullInvoice); // Store for logic use
       console.log('DEBUG: Fetched fullInvoice for Append:', fullInvoice);
 
       // Parse existing materials
@@ -244,7 +249,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
         // Default to standard 9% rate for consistency, unless previously customized in settings
         cgstRate: /* fullInvoice.cgst ? (fullInvoice.cgst / ((fullInvoice.subtotal || 0) + (Number(fullInvoice.additionalCharges) || 0)) * 100) : */ (prev.cgstRate || 9),
         sgstRate: /* fullInvoice.sgst ? (fullInvoice.sgst / ((fullInvoice.subtotal || 0) + (Number(fullInvoice.additionalCharges) || 0)) * 100) : */ (prev.sgstRate || 9),
-        applyGst: (fullInvoice.cgst > 0 || fullInvoice.sgst > 0),
+        applyGst: (fullInvoice.cgst !== null && fullInvoice.cgst > 0) || (fullInvoice.sgst !== null && fullInvoice.sgst > 0),
         customerName: fullInvoice.customerName || prev.customerName,
         additionalCharges: fullInvoice.additionalCharges ? Number(fullInvoice.additionalCharges) : 0,
         additionalChargesDescription: fullInvoice.additionalChargesDescription || '',
@@ -259,7 +264,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
     } catch (err) {
       toast.error("Failed to load existing invoice details");
       setIsAppendMode(false);
-      setShowAppendAlert(true); // Re-show alert so user can try again or ignore
+      setShowAppendSelection(true); // Re-show selection so user can try again
     }
   };
 
@@ -372,7 +377,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
       });
       setIsAppendMode(false);
       setExistingInvoice(null);
-      setExistingInvoice(null);
+      setExistingInvoices([]);
+      setShowAppendSelection(false);
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to process invoice');
     } finally {
@@ -410,25 +416,91 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
     <Modal isOpen={isOpen} onClose={onClose} title={isAppendMode ? `Update Invoice: ${existingInvoice?.invoiceNo}` : `Create ${type} Invoice`} size="xl">
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {showAppendAlert && existingInvoice && !isAppendMode && (
-          <Alert className="bg-blue-50 border-blue-200">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800">Existing Invoice Found</AlertTitle>
-            <AlertDescription className="text-blue-700 flex flex-col gap-2">
-              <p>
-                An open invoice <strong>{existingInvoice.invoiceNo}</strong> exists for this company
-                (Date: {new Date(existingInvoice.date).toLocaleDateString()}, Total: ₹{existingInvoice.grandTotal}).
-              </p>
-              <div className="flex gap-2 mt-2">
-                <Button type="button" size="sm" onClick={handleAppendConfirm} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Append to {existingInvoice.invoiceNo}
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowAppendAlert(false)} className="border-blue-300 text-blue-700 hover:bg-blue-100">
-                  Create New Invoice
-                </Button>
+        {showAppendSelection && existingInvoices.length > 0 && !isAppendMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex items-start gap-2 mb-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-semibold text-blue-900">Existing Invoices Found for Company</h4>
+                <p className="text-xs text-blue-700 mt-0.5">Select an invoice to append new entries to it, or strictly create a new one.</p>
               </div>
-            </AlertDescription>
-          </Alert>
+            </div>
+
+            <div className="space-y-2 max-h-[200px] overflow-y-auto mb-3 pr-1">
+              {existingInvoices.map((inv) => (
+                <label key={inv.id} className="flex items-center justify-between p-2.5 rounded-md border bg-white cursor-pointer hover:border-blue-300 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="existingInvoice"
+                      value={inv.id}
+                      checked={selectedExistingInvoiceId === inv.id}
+                      onChange={() => setSelectedExistingInvoiceId(inv.id)}
+                      className="text-blue-600 focus:ring-blue-500 h-4 w-4"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-blue-900">{inv.invoiceNo}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span>{new Date(inv.date).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>{inv.invoiceManifests?.length || 0} Entries</span>
+                        <span>•</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] uppercase font-medium border ${inv.status === 'paid' ? 'bg-green-100 text-green-700 border-green-200' :
+                            inv.status === 'partial' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                              'bg-amber-100 text-amber-700 border-amber-200'
+                          }`}>
+                          {inv.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold text-blue-900">
+                    ₹{inv.grandTotal.toLocaleString()}
+                  </div>
+                </label>
+              ))}
+
+              <label className="flex items-center gap-3 p-2.5 rounded-md border bg-white cursor-pointer hover:border-blue-300 transition-colors">
+                <input
+                  type="radio"
+                  name="existingInvoice"
+                  value="new"
+                  checked={selectedExistingInvoiceId === 'new'}
+                  onChange={() => setSelectedExistingInvoiceId('new')}
+                  className="text-blue-600 focus:ring-blue-500 h-4 w-4"
+                />
+                <div className="text-sm font-medium text-blue-900">Create New Invoice</div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="text-blue-700 border-blue-200 hover:bg-blue-100"
+                onClick={() => setShowAppendSelection(false)}
+              >
+                Cancel / Ignore
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={!selectedExistingInvoiceId}
+                onClick={() => {
+                  if (selectedExistingInvoiceId === 'new') {
+                    setShowAppendSelection(false);
+                    // Just proceed with new invoice form (default)
+                  } else if (selectedExistingInvoiceId) {
+                    handleAppendConfirm(selectedExistingInvoiceId);
+                  }
+                }}
+              >
+                Confirm Selection
+              </Button>
+            </div>
+          </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

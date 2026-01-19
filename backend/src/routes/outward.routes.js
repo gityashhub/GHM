@@ -1,6 +1,7 @@
 import express from 'express';
 import outwardController from '../controllers/outward.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { authorize } from '../middleware/role.middleware.js';
 import { validate, createOutwardEntrySchema, updateOutwardEntrySchema } from '../utils/validators.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/:id', authenticate, outwardController.getEntryById.bind(outwardCont
 router.post(
   '/',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(createOutwardEntrySchema),
   outwardController.createEntry.bind(outwardController)
 );
@@ -28,12 +30,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  authorize(['superadmin', 'employee']),
   validate(updateOutwardEntrySchema),
   outwardController.updateEntry.bind(outwardController)
 );
 
 // Delete outward entry
-router.delete('/:id', authenticate, outwardController.deleteEntry.bind(outwardController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), outwardController.deleteEntry.bind(outwardController));
 
 // Get consolidated summary
 router.get('/summary/all', authenticate, outwardController.getSummary.bind(outwardController));

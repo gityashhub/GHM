@@ -227,8 +227,10 @@ class InvoicesService {
   /**
    * Get statistics
    */
-  async getStats(): Promise<InvoiceStats> {
-    const response = await apiClient.get<ApiResponse<{ stats: InvoiceStats }>>('/invoices/stats');
+  async getStats(type?: 'Inward' | 'Outward' | 'Transporter'): Promise<InvoiceStats> {
+    const response = await apiClient.get<ApiResponse<{ stats: InvoiceStats }>>('/invoices/stats', {
+      params: { type }
+    });
     return response.data.data.stats;
   }
 }

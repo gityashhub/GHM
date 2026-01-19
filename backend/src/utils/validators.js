@@ -150,6 +150,7 @@ export const createInwardEntrySchema = Joi.object({
   srNo: Joi.number().integer().positive().optional(),
   invoiceNo: Joi.string().optional().allow('', null),
   dcNo: Joi.string().optional().allow('', null),
+  remarks: Joi.string().optional().allow('', null),
 });
 
 export const updateInwardEntrySchema = Joi.object({
@@ -166,6 +167,7 @@ export const updateInwardEntrySchema = Joi.object({
   lotNo: Joi.string().optional().allow('', null),
   invoiceNo: Joi.string().optional().allow('', null),
   dcNo: Joi.string().optional().allow('', null),
+  remarks: Joi.string().optional().allow('', null),
 });
 
 // Inward Material validation schemas

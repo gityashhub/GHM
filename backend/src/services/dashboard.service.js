@@ -41,6 +41,7 @@ class DashboardService {
       }),
       prisma.invoice.count({
         where: {
+          type: 'Inward',
           date: {
             gte: startOfMonth,
           },
@@ -48,8 +49,9 @@ class DashboardService {
       }),
       prisma.invoice.aggregate({
         where: {
+          type: 'Inward',
           date: {
-            gte: startOfYear,
+            gte: startOfMonth,
           },
         },
         _sum: {
@@ -118,6 +120,7 @@ class DashboardService {
     // Get all invoices for the year
     const invoices = await prisma.invoice.findMany({
       where: {
+        type: 'Inward',
         date: {
           gte: startOfYear,
           lte: endOfYear,
@@ -152,7 +155,7 @@ class DashboardService {
       const month = new Date(invoice.date).getMonth();
       const revenue = parseFloat(invoice.grandTotal);
       const paid = parseFloat(invoice.paymentReceived);
-      
+
       monthlyData[month].revenue += revenue;
       monthlyData[month].paid += paid;
       monthlyData[month].pending += (revenue - paid);
@@ -166,85 +169,37 @@ class DashboardService {
    * @returns {Promise<object>} Payment status data
    */
   async getPaymentStatus() {
-    const [paidInvoices, pendingInvoices, partialInvoices] = await Promise.all([
-      prisma.invoice.aggregate({
-        where: {
-          status: 'paid',
-        },
-        _sum: {
-          grandTotal: true,
-          paymentReceived: true,
-        },
-        _count: true,
-      }),
-      prisma.invoice.aggregate({
-        where: {
-          status: 'pending',
-        },
-        _sum: {
-          grandTotal: true,
-          paymentReceived: true,
-        },
-        _count: true,
-      }),
-      prisma.invoice.aggregate({
-        where: {
-          status: 'partial',
-        },
-        _sum: {
-          grandTotal: true,
-          paymentReceived: true,
-        },
-        _count: true,
-      }),
-    ]);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const paidAmount = parseFloat(paidInvoices._sum.grandTotal || 0);
-    const pendingAmount = parseFloat(pendingInvoices._sum.grandTotal || 0);
-    const partialAmount = parseFloat(partialInvoices._sum.grandTotal || 0);
-    const partialPaid = parseFloat(partialInvoices._sum.paymentReceived || 0);
-    
-    // Calculate overdue (invoices older than 30 days with pending/partial status)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const overdueInvoices = await prisma.invoice.aggregate({
+    // Get all inward invoices for the current month
+    const invoices = await prisma.invoice.findMany({
       where: {
+        type: 'Inward',
         date: {
-          lt: thirtyDaysAgo,
-        },
-        status: {
-          in: ['pending', 'partial'],
+          gte: startOfMonth,
         },
       },
-      _sum: {
+      select: {
         grandTotal: true,
         paymentReceived: true,
       },
-      _count: true,
     });
 
-    const overdueAmount = parseFloat(overdueInvoices._sum.grandTotal || 0) - parseFloat(overdueInvoices._sum.paymentReceived || 0);
+    let totalInvoiced = 0;
+    let totalReceived = 0;
+
+    invoices.forEach((invoice) => {
+      totalInvoiced += parseFloat(invoice.grandTotal || 0);
+      totalReceived += parseFloat(invoice.paymentReceived || 0);
+    });
+
+    const totalPending = totalInvoiced - totalReceived;
 
     return {
-      paid: {
-        amount: paidAmount,
-        count: paidInvoices._count,
-      },
-      pending: {
-        amount: pendingAmount,
-        count: pendingInvoices._count,
-      },
-      partial: {
-        amount: partialAmount,
-        paid: partialPaid,
-        pending: partialAmount - partialPaid,
-        count: partialInvoices._count,
-      },
-      overdue: {
-        amount: overdueAmount,
-        count: overdueInvoices._count,
-      },
+      total: totalInvoiced,
+      received: totalReceived, // Previously 'paid'
+      pending: totalPending,
     };
   }
 
@@ -310,6 +265,9 @@ class DashboardService {
         },
       }),
       prisma.invoice.findMany({
+        where: {
+          type: 'Inward',
+        },
         take: limit,
         orderBy: {
           createdAt: 'desc',
@@ -327,6 +285,7 @@ class DashboardService {
       }),
       prisma.invoice.findMany({
         where: {
+          type: 'Inward',
           paymentReceived: {
             gt: 0,
           },

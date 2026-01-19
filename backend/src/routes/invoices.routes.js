@@ -12,19 +12,19 @@ const router = express.Router();
  */
 
 // Get all invoices
-router.get('/', authenticate, authorize(['admin']), invoicesController.getAllInvoices.bind(invoicesController));
+router.get('/', authenticate, authorize(['superadmin', 'admin']), invoicesController.getAllInvoices.bind(invoicesController));
 
 // Get invoice statistics
-router.get('/stats', authenticate, authorize(['admin']), invoicesController.getStats.bind(invoicesController));
+router.get('/stats', authenticate, authorize(['superadmin', 'admin']), invoicesController.getStats.bind(invoicesController));
 
 // Get invoice by ID
-router.get('/:id', authenticate, authorize(['admin']), invoicesController.getInvoiceById.bind(invoicesController));
+router.get('/:id', authenticate, authorize(['superadmin', 'admin']), invoicesController.getInvoiceById.bind(invoicesController));
 
 // Create invoice
 router.post(
   '/',
   authenticate,
-  authorize(['admin']),
+  authorize(['superadmin']),
   validate(createInvoiceSchema),
   invoicesController.createInvoice.bind(invoicesController)
 );
@@ -33,7 +33,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['admin']),
+  authorize(['superadmin']),
   validate(updateInvoiceSchema),
   invoicesController.updateInvoice.bind(invoicesController)
 );
@@ -42,13 +42,13 @@ router.put(
 router.put(
   '/:id/payment',
   authenticate,
-  authorize(['admin']),
+  authorize(['superadmin']),
   validate(updateInvoicePaymentSchema),
   invoicesController.updatePayment.bind(invoicesController)
 );
 
 // Delete invoice
-router.delete('/:id', authenticate, authorize(['admin']), invoicesController.deleteInvoice.bind(invoicesController));
+router.delete('/:id', authenticate, authorize(['superadmin']), invoicesController.deleteInvoice.bind(invoicesController));
 
 export default router;
 

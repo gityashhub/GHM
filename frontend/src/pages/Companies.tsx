@@ -324,7 +324,7 @@ export default function Companies() {
     { key: "city", header: "City", render: (c: Company) => c.city || '-' },
     { key: "contact", header: "Contact", render: (c: Company) => c.contact || '-' },
     { key: "gstNumber", header: "GST Number", render: (c: Company) => c.gstNumber || '-' },
-    ...(user?.role === 'admin' ? [{
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [{
       key: "materials",
       header: "Materials & Rates",
       render: (company: Company) => (
@@ -342,7 +342,7 @@ export default function Companies() {
         </div>
       ),
     }] : []),
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       {
         key: "totalInvoiced",
         header: "Total Invoiced",
@@ -389,19 +389,23 @@ export default function Companies() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => handleEdit(company)}
-            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(company.id)}
-            disabled={deleteMutation.isPending}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {user?.role !== 'admin' && (
+            <>
+              <button
+                onClick={() => handleEdit(company)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDelete(company.id)}
+                disabled={deleteMutation.isPending}
+                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       ),
     },
@@ -468,7 +472,7 @@ export default function Companies() {
                     { key: 'contact', header: 'Contact' },
                     { key: 'email', header: 'Email' },
                     { key: 'createdAt', header: 'Created At' },
-                    ...(user?.role === 'admin' ? [
+                    ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                       { key: 'totalInvoiced', header: 'Total Invoiced' },
                       { key: 'totalPaid', header: 'Total Paid' },
                       { key: 'totalPending', header: 'Total Pending' },
@@ -497,9 +501,11 @@ export default function Companies() {
           >
             <Download className="w-4 h-4" /> <span className="hidden md:inline">Export CSV</span>
           </button>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
-            <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Add Company</span>
-          </button>
+          {user?.role !== 'admin' && (
+            <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
+              <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Add Company</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -510,7 +516,7 @@ export default function Companies() {
           <p className="text-sm text-muted-foreground">Total Companies</p>
           <p className="text-xl md:text-2xl font-bold text-foreground mt-1">{pagination.total}</p>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Invoiced</p>
@@ -640,7 +646,7 @@ export default function Companies() {
 
 
 
-          {user?.role === 'admin' && (
+          {['admin', 'superadmin'].includes(user?.role || '') && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-sm font-medium text-foreground">
@@ -788,7 +794,7 @@ function CompanyDetails({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
-      {user?.role === 'admin' && (
+      {['admin', 'superadmin'].includes(user?.role || '') && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="glass-card p-4">
             <p className="text-sm text-muted-foreground">Total Invoiced</p>

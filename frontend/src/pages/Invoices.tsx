@@ -14,9 +14,11 @@ import CreateInvoiceModal from "@/components/common/CreateInvoiceModal";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { exportToCSV, formatDateForExport, formatCurrencyForExport } from "@/utils/export";
 import { generateInvoicePDF } from "@/utils/pdfGenerator";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Invoices() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -38,8 +40,9 @@ export default function Invoices() {
 
   // Fetch invoices (use debounced search term with pagination)
   const { data, isLoading, error } = useQuery<{ invoices: Invoice[]; pagination: any }>({
-    queryKey: ['invoices', debouncedSearchTerm, currentPage, pageSize],
+    queryKey: ['invoices', debouncedSearchTerm, currentPage, pageSize, 'Inward'],
     queryFn: () => invoicesService.getInvoices({
+      type: 'Inward',
       search: debouncedSearchTerm || undefined,
       page: currentPage,
       limit: pageSize,
@@ -50,8 +53,8 @@ export default function Invoices() {
 
   // Fetch statistics (cache for longer)
   const { data: statsData } = useQuery<InvoiceStats>({
-    queryKey: ['invoice-stats'],
-    queryFn: () => invoicesService.getStats(),
+    queryKey: ['invoice-stats', 'Inward'],
+    queryFn: () => invoicesService.getStats('Inward'),
     staleTime: 0, // Always fetch fresh stats
     refetchInterval: 10000,
   });
@@ -298,14 +301,16 @@ export default function Invoices() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => handleDelete(invoice.id)}
-            disabled={deleteMutation.isPending}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-            title="Delete Invoice"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {user?.role !== 'admin' && (
+            <button
+              onClick={() => handleDelete(invoice.id)}
+              disabled={deleteMutation.isPending}
+              className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              title="Delete Invoice"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -313,7 +318,7 @@ export default function Invoices() {
 
   if (isLoading) {
     return (
-      <MainLayout title="Invoice Management" subtitle="Track and manage all invoices">
+      <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -323,7 +328,7 @@ export default function Invoices() {
 
   if (error) {
     return (
-      <MainLayout title="Invoice Management" subtitle="Track and manage all invoices">
+      <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
         <div className="text-center py-12">
           <p className="text-destructive">Failed to load invoices</p>
         </div>
@@ -332,7 +337,7 @@ export default function Invoices() {
   }
 
   return (
-    <MainLayout title="Invoice Management" subtitle="Track and manage all invoices">
+    <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
       {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
@@ -357,6 +362,7 @@ export default function Invoices() {
               const toastId = toast.loading('Exporting invoices...');
               const { invoices: allInvoices } = await invoicesService.getInvoices({
                 limit: 10000,
+                type: 'Inward',
                 search: debouncedSearchTerm || undefined,
               });
 
@@ -422,24 +428,26 @@ export default function Invoices() {
           <span className="hidden md:inline">Export CSV</span>
         </button>
         <div className="flex gap-2">
-          <Button onClick={() => {
-            setInvoiceType('Inward');
-            setIsCreateInvoiceOpen(true);
-          }}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Inward Invoice
-          </Button>
+          {user?.role !== 'admin' && (
+            <Button onClick={() => {
+              setInvoiceType('Inward');
+              setIsCreateInvoiceOpen(true);
+            }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Inward Invoice
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="glass-card p-4">
-          <p className="text-sm text-muted-foreground">Total Invoices</p>
+          <p className="text-sm text-muted-foreground">Total Inward Invoices</p>
           <p className="text-2xl font-bold text-foreground mt-1">{stats.totalInvoices}</p>
         </div>
         <div className="glass-card p-4">
-          <p className="text-sm text-muted-foreground">Total Invoiced Amount</p>
+          <p className="text-sm text-muted-foreground">Total Inward Amount</p>
           <p className="text-2xl font-bold text-foreground mt-1">
             ₹{stats.totalInvoiced.toLocaleString()}
           </p>
@@ -456,31 +464,6 @@ export default function Invoices() {
             ₹{stats.totalPending.toLocaleString()}
           </p>
         </div>
-      </div>
-
-      {/* Invoice Type Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {stats.byType.map((typeStat) => (
-          <div
-            key={typeStat.type}
-            className={`glass-card p-4 border-l-4 ${typeStat.type === "Inward"
-              ? "border-l-primary"
-              : typeStat.type === "Outward"
-                ? "border-l-warning"
-                : "border-l-chart-4"
-              }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">{typeStat.type} Invoices</p>
-                <p className="text-xl font-bold text-foreground mt-1">{typeStat.count}</p>
-              </div>
-              <p className="text-lg font-medium text-foreground">
-                ₹{typeStat.totalInvoiced.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Data Table */}
@@ -566,6 +549,7 @@ function InvoiceDetails({
   onUpdatePayment,
   isLoading,
 }: any) {
+  const { user } = useAuth();
   return (
     <div className="space-y-6">
       {/* Basic Info */}
@@ -692,7 +676,7 @@ function InvoiceDetails({
               </p>
             )}
           </div>
-          {!paymentEditOpen && (
+          {!paymentEditOpen && user?.role !== 'admin' && (
             <Button variant="outline" onClick={onEditPayment}>
               <Edit className="w-4 h-4 mr-2" />
               Edit Payment

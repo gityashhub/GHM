@@ -354,35 +354,18 @@ class CompaniesService {
       throw new NotFoundError('Company');
     }
 
-    // Separate invoiced and uninvoiced entries
-    const uninvoicedEntries = company.inwardEntries.filter(entry => !entry.invoiceId);
+    // Get invoiced entries
     const invoicedEntries = company.inwardEntries.filter(entry => entry.invoiceId);
-
-    // Calculate uninvoiced value (estimate with GST)
-    const uninvoicedValue = uninvoicedEntries.reduce((sum, entry) => {
-      let rate = Number(entry.rate);
-      if (!rate || rate === 0) {
-        // Fallback to material rate
-        const material = company.materials.find(m => m.materialName === entry.wasteName);
-        rate = material ? Number(material.rate) : 0;
-      }
-      const amount = Number(entry.quantity) * rate;
-      const gstAmount = amount * 0.18; // 18% GST estimate
-      return sum + amount + gstAmount;
-    }, 0);
 
     // Get unique invoice IDs from invoiced entries
     const invoiceIds = [...new Set(invoicedEntries.map(e => e.invoiceId).filter(Boolean))];
 
     // Calculate actual invoiced total from invoice grand totals
-    let invoicedTotal = 0;
+    let totalInvoiced = 0;
     if (invoiceIds.length > 0) {
       const invoices = company.invoices.filter(inv => invoiceIds.includes(inv.id));
-      invoicedTotal = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+      totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
     }
-
-    // Total invoiced = uninvoiced estimate + actual invoice totals
-    const totalInvoiced = uninvoicedValue + invoicedTotal;
 
     // Total paid from all invoices
     const totalPaid = company.invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
@@ -427,35 +410,18 @@ class CompaniesService {
     let totalPaid = 0;
 
     for (const company of companies) {
-      // Separate invoiced and uninvoiced entries
-      const uninvoicedEntries = company.inwardEntries.filter(entry => !entry.invoiceId);
+      // Get invoiced entries
       const invoicedEntries = company.inwardEntries.filter(entry => entry.invoiceId);
-
-      // Calculate uninvoiced value (estimate with GST)
-      const uninvoicedValue = uninvoicedEntries.reduce((sum, entry) => {
-        let rate = Number(entry.rate);
-        if (!rate || rate === 0) {
-          // Fallback to material rate
-          const material = company.materials.find((m) => m.materialName === entry.wasteName);
-          rate = material ? Number(material.rate) : 0;
-        }
-        const amount = Number(entry.quantity) * rate;
-        const gstAmount = amount * 0.18; // 18% GST estimate
-        return sum + amount + gstAmount;
-      }, 0);
 
       // Get unique invoice IDs from invoiced entries
       const invoiceIds = [...new Set(invoicedEntries.map(e => e.invoiceId).filter(Boolean))];
 
       // Calculate actual invoiced total from invoice grand totals
-      let companyInvoicedTotal = 0;
+      let companyInvoiced = 0;
       if (invoiceIds.length > 0) {
         const invoices = company.invoices.filter(inv => invoiceIds.includes(inv.id));
-        companyInvoicedTotal = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+        companyInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
       }
-
-      // Company total = uninvoiced estimate + actual invoice totals
-      const companyInvoiced = uninvoicedValue + companyInvoicedTotal;
 
       const companyPaid = company.invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import outwardMaterialsController from '../controllers/outwardMaterials.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { authorize } from '../middleware/role.middleware.js';
 import { validate, createOutwardMaterialSchema, updateOutwardMaterialSchema } from '../utils/validators.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/:id', authenticate, outwardMaterialsController.getMaterialById.bind
 router.post(
     '/',
     authenticate,
+    authorize(['superadmin', 'employee']),
     validate(createOutwardMaterialSchema),
     outwardMaterialsController.createMaterial.bind(outwardMaterialsController)
 );
@@ -28,11 +30,12 @@ router.post(
 router.put(
     '/:id',
     authenticate,
+    authorize(['superadmin', 'employee']),
     validate(updateOutwardMaterialSchema),
     outwardMaterialsController.updateMaterial.bind(outwardMaterialsController)
 );
 
 // Delete outward material
-router.delete('/:id', authenticate, outwardMaterialsController.deleteMaterial.bind(outwardMaterialsController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), outwardMaterialsController.deleteMaterial.bind(outwardMaterialsController));
 
 export default router;

@@ -43,6 +43,7 @@ class InwardService {
           { month: { contains: search, mode: 'insensitive' } },
           { vehicleNo: { contains: search, mode: 'insensitive' } },
           { category: { contains: search, mode: 'insensitive' } },
+          { company: { name: { contains: search, mode: 'insensitive' } } },
         ]
       });
     }
@@ -85,7 +86,13 @@ class InwardService {
         orderBy: { [sortBy]: sortOrder },
         include: {
           company: true,
-          invoice: true,
+          invoice: {
+            include: {
+              _count: {
+                select: { invoiceMaterials: true }
+              }
+            }
+          },
           inwardMaterials: {
             orderBy: { createdAt: 'asc' },
           },
@@ -189,6 +196,7 @@ class InwardService {
       unit,
       month,
       lotNo,
+      remarks,
     } = entryData;
 
     // Validate required fields
@@ -196,67 +204,101 @@ class InwardService {
       throw new ValidationError('Date, company, manifest number, waste name, quantity, and unit are required');
     }
 
-    // Check if company exists and get materials
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      include: {
-        materials: true,
-      },
-    });
-
-    if (!company) {
-      throw new NotFoundError('Company');
-    }
-
-    // Auto-populate rate from company material if not provided
-    let finalRate = rate;
-    if (!finalRate || finalRate === null || finalRate === undefined) {
-      const material = company.materials.find(m => m.materialName === wasteName);
-      if (material && material.rate) {
-        finalRate = material.rate;
-      }
-    }
-
-    // Generate sr_no if not provided
-    const srNo = entryData.srNo || (await this.getNextSrNo());
-
-    // Generate lot number if not provided
-    const finalLotNo = lotNo || (await this.generateLotNo());
-
-    // Check lot number uniqueness
-    if (finalLotNo) {
-      const existing = await prisma.inwardEntry.findUnique({
-        where: { lotNo: finalLotNo },
+    // Use transaction to ensure data consistency and reduce race conditions
+    const entry = await prisma.$transaction(async (tx) => {
+      // Check if company exists and get materials
+      const company = await tx.company.findUnique({
+        where: { id: companyId },
+        include: {
+          materials: true,
+        },
       });
 
-      if (existing) {
-        throw new ValidationError('Lot number already exists');
+      if (!company) {
+        throw new NotFoundError('Company');
       }
-    }
 
-    // Create entry
-    const entry = await prisma.inwardEntry.create({
-      data: {
-        srNo,
-        date: new Date(date),
-        lotNo: finalLotNo,
-        companyId,
-        manifestNo: manifestNo.trim(),
-        vehicleNo: vehicleNo?.trim() || null,
-        wasteName: wasteName.trim(),
-        rate: finalRate ? parseFloat(finalRate) : null,
-        category: category?.trim() || null,
-        quantity: parseFloat(quantity),
-        unit: unit.trim(),
-        month: month?.trim() || null,
-      },
-      include: {
-        company: true,
-        invoice: true,
-        inwardMaterials: {
-          orderBy: { createdAt: 'asc' },
+      // Auto-populate rate from company material if not provided
+      let finalRate = rate;
+      if (!finalRate || finalRate === null || finalRate === undefined) {
+        const material = company.materials.find(m => m.materialName === wasteName);
+        if (material && material.rate) {
+          finalRate = material.rate;
+        }
+      }
+
+      // Generate sr_no if not provided
+      // Doing this inside transaction reduces race condition window
+      let srNo = entryData.srNo;
+      if (!srNo) {
+        const lastEntry = await tx.inwardEntry.findFirst({
+          orderBy: { srNo: 'desc' },
+          select: { srNo: true },
+        });
+        srNo = lastEntry?.srNo ? lastEntry.srNo + 1 : 1;
+      }
+
+      // Generate unique lot number if not provided
+      let finalLotNo = lotNo;
+      if (!finalLotNo) {
+        // Reuse the logic but adapted for transaction
+        const year = new Date().getFullYear();
+        const month = String(new Date().getMonth() + 1).padStart(2, '0');
+
+        const lastLotEntry = await tx.inwardEntry.findFirst({
+          where: {
+            lotNo: {
+              startsWith: `LOT-${year}${month}`,
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { lotNo: true },
+        });
+
+        if (lastLotEntry?.lotNo) {
+          const lastNum = parseInt(lastLotEntry.lotNo.split('-').pop()) || 0;
+          finalLotNo = `LOT-${year}${month}-${String(lastNum + 1).padStart(4, '0')}`;
+        } else {
+          finalLotNo = `LOT-${year}${month}-0001`;
+        }
+      }
+
+      // Check lot number uniqueness
+      if (finalLotNo) {
+        const existing = await tx.inwardEntry.findUnique({
+          where: { lotNo: finalLotNo },
+        });
+
+        if (existing) {
+          throw new ValidationError('Lot number already exists');
+        }
+      }
+
+      // Create entry
+      return await tx.inwardEntry.create({
+        data: {
+          srNo,
+          date: new Date(date),
+          lotNo: finalLotNo,
+          companyId,
+          manifestNo: manifestNo.trim(),
+          vehicleNo: vehicleNo?.trim() || null,
+          wasteName: wasteName.trim(),
+          rate: finalRate ? parseFloat(finalRate) : null,
+          category: category?.trim() || null,
+          quantity: parseFloat(quantity),
+          unit: unit.trim(),
+          month: month?.trim() || null,
+          remarks: remarks?.trim() || null,
         },
-      },
+        include: {
+          company: true,
+          invoice: true,
+          inwardMaterials: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      });
     });
 
     return entry;
@@ -300,6 +342,7 @@ class InwardService {
         ...(updateData.unit !== undefined && { unit: updateData.unit.trim() }),
         ...(updateData.month !== undefined && { month: updateData.month?.trim() || null }),
         ...(updateData.lotNo !== undefined && { lotNo: updateData.lotNo?.trim() || null }),
+        ...(updateData.remarks !== undefined && { remarks: updateData.remarks?.trim() || null }),
       },
       include: {
         company: true,
@@ -362,24 +405,7 @@ class InwardService {
     const totalEntries = aggregations._count.id;
     const totalQuantity = Number(aggregations._sum.quantity) || 0;
 
-    // 2. Calculate Uninvoiced Value (Estimated: Qty * Rate * 1.18 GST)
-    const uninvoicedEntries = await prisma.inwardEntry.findMany({
-      where: {
-        invoiceId: null,
-      },
-      select: {
-        quantity: true,
-        rate: true,
-      },
-    });
-
-    const uninvoicedValue = uninvoicedEntries.reduce((sum, entry) => {
-      const amount = Number(entry.quantity) * (Number(entry.rate) || 0);
-      const gstAmount = amount * 0.18; // 18% GST estimate
-      return sum + amount + gstAmount;
-    }, 0);
-
-    // 3. Calculate Invoiced Value and Payment Received from UNIQUE invoices
+    // 2. Calculate Invoiced Value and Payment Received from UNIQUE invoices
     // We strictly use the Invoice's Grand Total, as it is the source of truth for the bill (including extra charges)
     const distinctInvoices = await prisma.inwardEntry.findMany({
       where: {
@@ -393,7 +419,7 @@ class InwardService {
 
     const invoiceIds = distinctInvoices.map(e => e.invoiceId);
 
-    let invoicedTotal = 0;
+    let totalInvoiced = 0;
     let totalReceived = 0;
 
     if (invoiceIds.length > 0) {
@@ -407,11 +433,9 @@ class InwardService {
         }
       });
 
-      invoicedTotal = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+      totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
       totalReceived = invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
     }
-
-    const totalInvoiced = uninvoicedValue + invoicedTotal;
 
     return {
       totalEntries,

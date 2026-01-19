@@ -11,19 +11,19 @@ const router = express.Router();
  */
 
 // Get dashboard statistics
-router.get('/stats', authenticate, authorize(['admin']), dashboardController.getStats.bind(dashboardController));
+router.get('/stats', authenticate, authorize(['superadmin', 'admin']), dashboardController.getStats.bind(dashboardController));
 
 // Get revenue chart data
-router.get('/revenue', authenticate, authorize(['admin']), dashboardController.getRevenueChart.bind(dashboardController));
+router.get('/revenue', authenticate, authorize(['superadmin', 'admin']), dashboardController.getRevenueChart.bind(dashboardController));
 
 // Get payment status breakdown
-router.get('/payment-status', authenticate, authorize(['admin']), dashboardController.getPaymentStatus.bind(dashboardController));
+router.get('/payment-status', authenticate, authorize(['superadmin', 'admin']), dashboardController.getPaymentStatus.bind(dashboardController));
 
 // Get recent activity
-router.get('/recent-activity', authenticate, authorize(['admin']), dashboardController.getRecentActivity.bind(dashboardController));
+router.get('/recent-activity', authenticate, authorize(['superadmin', 'admin']), dashboardController.getRecentActivity.bind(dashboardController));
 
 // Get waste flow chart data
-router.get('/waste-flow', authenticate, authorize(['admin']), dashboardController.getWasteFlow.bind(dashboardController));
+router.get('/waste-flow', authenticate, authorize(['superadmin', 'admin']), dashboardController.getWasteFlow.bind(dashboardController));
 
 export default router;
 

@@ -11,19 +11,19 @@ const router = express.Router();
  */
 
 // Get all settings
-router.get('/', authenticate, authorize(['admin']), settingsController.getAllSettings.bind(settingsController));
+router.get('/', authenticate, authorize(['superadmin', 'admin']), settingsController.getAllSettings.bind(settingsController));
 
 // Get setting by key
-router.get('/:key', authenticate, authorize(['admin']), settingsController.getSettingByKey.bind(settingsController));
+router.get('/:key', authenticate, authorize(['superadmin', 'admin']), settingsController.getSettingByKey.bind(settingsController));
 
 // Update setting
-router.put('/:key', authenticate, authorize(['admin']), settingsController.updateSetting.bind(settingsController));
+router.put('/:key', authenticate, authorize(['superadmin']), settingsController.updateSetting.bind(settingsController));
 
 // Bulk update settings
-router.post('/bulk', authenticate, authorize(['admin']), settingsController.bulkUpdateSettings.bind(settingsController));
+router.post('/bulk', authenticate, authorize(['superadmin']), settingsController.bulkUpdateSettings.bind(settingsController));
 
 // Delete setting
-router.delete('/:key', authenticate, authorize(['admin']), settingsController.deleteSetting.bind(settingsController));
+router.delete('/:key', authenticate, authorize(['superadmin']), settingsController.deleteSetting.bind(settingsController));
 
 export default router;
 

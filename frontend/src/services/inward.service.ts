@@ -14,6 +14,7 @@ export interface InwardEntry {
   quantity: number;
   unit: string;
   month: string | null;
+  remarks: string | null;
   invoiceId: string | null;
   company?: {
     id: string;
@@ -74,6 +75,7 @@ export interface CreateInwardEntryData {
   unit: 'MT' | 'Kg' | 'KL';
   month?: string;
   lotNo?: string;
+  remarks?: string;
 }
 
 export interface UpdateInwardEntryData {
@@ -88,6 +90,7 @@ export interface UpdateInwardEntryData {
   unit?: 'MT' | 'Kg' | 'KL';
   month?: string;
   lotNo?: string;
+  remarks?: string;
 }
 
 export interface CreateInwardMaterialData {

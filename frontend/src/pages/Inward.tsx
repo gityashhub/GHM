@@ -231,6 +231,7 @@ export default function Inward() {
       unit: formData.unit,
       month: formData.month || undefined,
       lotNo: formData.lotNo || undefined,
+      remarks: formData.remarks || undefined,
     };
 
     createMutation.mutate(entryData);
@@ -251,6 +252,7 @@ export default function Inward() {
       unit: formData.unit,
       month: formData.month || undefined,
       lotNo: formData.lotNo || undefined,
+      remarks: formData.remarks || undefined,
     };
 
     updateMutation.mutate({ id: editingEntry.id, data: entryData });
@@ -274,7 +276,7 @@ export default function Inward() {
     { key: "manifestNo", header: "Manifest No." },
     { key: "vehicleNo", header: "Vehicle No.", render: (e: InwardEntry) => e.vehicleNo || '-' },
     { key: "wasteName", header: "Waste Name" },
-    ...(user?.role === 'admin' ? [
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
       { key: "rate", header: "Rate", render: (e: InwardEntry) => e.rate ? `₹${Number(e.rate).toFixed(2)}/${e.unit}` : '-' },
     ] : []),
     {
@@ -285,7 +287,18 @@ export default function Inward() {
       ) : '-',
     },
     { key: "quantity", header: "Quantity", render: (e: InwardEntry) => `${e.quantity} ${e.unit}` },
-    ...(user?.role === 'admin' ? [
+    { key: "remarks", header: "Remarks", render: (e: InwardEntry) => <span className="text-muted-foreground italic text-xs truncate max-w-[150px]" title={e.remarks || ''}>{e.remarks || '-'}</span> },
+    ...(['admin', 'superadmin'].includes(user?.role || '') ? [
+      {
+        key: "amount",
+        header: "Amount",
+        render: (e: InwardEntry) => {
+          const quantity = Number(e.quantity) || 0;
+          const rate = Number(e.rate) || 0;
+          const amount = quantity * rate;
+          return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+      },
       { key: "invoiceNo", header: "Invoice No.", render: (e: InwardEntry) => e.invoice?.invoiceNo || "-" },
       {
         key: "grossAmount",
@@ -294,7 +307,33 @@ export default function Inward() {
           const quantity = Number(e.quantity) || 0;
           const rate = Number(e.rate) || 0;
           const baseAmount = quantity * rate;
-          return `₹${baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+          if (!e.invoice) {
+            return `₹${baseAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          }
+
+          const invSubtotal = Number(e.invoice.subtotal) || 0;
+          const invGrandTotal = Number(e.invoice.grandTotal) || 0;
+
+          // @ts-ignore - _count is injected by backend
+          const itemCount = e.invoice._count?.invoiceMaterials || 0;
+
+          let entryGross = baseAmount;
+
+          if (itemCount > 0) {
+            // EQUAL SPLIT LOGIC
+            // Tax + Charges = GrandTotal - Subtotal
+            const totalTaxAndCharges = invGrandTotal - invSubtotal;
+            if (totalTaxAndCharges > 0) {
+              const sharePerItem = totalTaxAndCharges / itemCount;
+              entryGross = baseAmount + sharePerItem;
+            }
+          } else if (invSubtotal > 0 && invGrandTotal > 0) {
+            // Fallback if count is missing (legacy/error case)
+            entryGross = baseAmount * (invGrandTotal / invSubtotal);
+          }
+
+          return `₹${entryGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
       },
       {
@@ -310,13 +349,30 @@ export default function Inward() {
           const invGrandTotal = Number(e.invoice.grandTotal) || 0;
           const invPaymentReceived = Number(e.invoice.paymentReceived) || 0;
 
-          // Calculate full proportional grand total (Gross + GST + Charges)
-          let entryTotal = baseAmount;
-          if (invSubtotal > 0 && invGrandTotal > 0) {
-            entryTotal = baseAmount * (invGrandTotal / invSubtotal);
+          // If no payment received on invoice, show nothing as requested
+          if (invPaymentReceived <= 0) return "-";
+
+          // Calculate Entry Gross Amount using EQUAL SPLIT logic (same as Gross Amount column)
+          // @ts-ignore - _count is injected by backend
+          const itemCount = e.invoice._count?.invoiceMaterials || 0;
+          let entryGross = baseAmount;
+
+          if (itemCount > 0) {
+            const totalTaxAndCharges = invGrandTotal - invSubtotal;
+            if (totalTaxAndCharges > 0) {
+              const sharePerItem = totalTaxAndCharges / itemCount;
+              entryGross = baseAmount + sharePerItem;
+            }
+          } else if (invSubtotal > 0 && invGrandTotal > 0) {
+            // Fallback
+            entryGross = baseAmount * (invGrandTotal / invSubtotal);
           }
 
-          return `₹${entryTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+          // Calculate proportional payment for this specific entry based on Invoice's payment status
+          const paymentRatio = invGrandTotal > 0 ? (invPaymentReceived / invGrandTotal) : 0;
+          const entryPaymentReceived = entryGross * paymentRatio;
+
+          return `₹${entryPaymentReceived.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
         }
       },
       { key: "paymentReceivedOn", header: "Payment Received On", render: (e: InwardEntry) => e.invoice?.paymentReceivedOn ? format(new Date(e.invoice.paymentReceivedOn), 'dd MMM yyyy') : "-" },
@@ -353,33 +409,37 @@ export default function Inward() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setEditingEntry(e);
-              setIsEditModalOpen(true);
-            }}
-            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            title="Edit Entry"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          {user?.role === 'admin' && !e.invoiceId && (
-            <button
-              onClick={() => handleCreateInvoice([e.id])}
-              className="p-2 rounded-lg text-muted-foreground hover:text-success hover:bg-success/10 transition-colors"
-              title="Create Invoice"
-            >
-              <FileText className="w-4 h-4" />
-            </button>
+          {user?.role !== 'admin' && (
+            <>
+              <button
+                onClick={() => {
+                  setEditingEntry(e);
+                  setIsEditModalOpen(true);
+                }}
+                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                title="Edit Entry"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+              {user?.role === 'superadmin' && !e.invoiceId && (
+                <button
+                  onClick={() => handleCreateInvoice([e.id])}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-success hover:bg-success/10 transition-colors"
+                  title="Create Invoice"
+                >
+                  <FileText className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => handleDelete(e.id)}
+                disabled={deleteMutation.isPending}
+                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
           )}
-          <button
-            onClick={() => handleDelete(e.id)}
-            disabled={deleteMutation.isPending}
-            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-            title="Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
         </div>
       ),
     },
@@ -456,11 +516,12 @@ export default function Inward() {
                         { key: 'manifestNo', header: 'Manifest No.' },
                         { key: 'vehicleNo', header: 'Vehicle No.' },
                         { key: 'wasteName', header: 'Waste Name' },
-                        ...(user?.role === 'admin' ? [{ key: 'rate', header: 'Rate' }] : []),
+                        ...(user?.role === 'admin' || user?.role === 'superadmin' ? [{ key: 'rate', header: 'Rate' }] : []),
                         { key: 'category', header: 'Category' },
                         { key: 'quantity', header: 'Quantity' },
+                        { key: 'remarks', header: 'Remarks' },
                         { key: 'invoiceNo', header: 'Invoice No.' },
-                        ...(user?.role === 'admin' ? [
+                        ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                           { key: 'calculatedAmount', header: 'Gross Amount' },
                           { key: 'allocatedPayment', header: 'Payment Received' },
                           { key: 'paymentReceivedOn', header: 'Payment Received On' },
@@ -541,7 +602,7 @@ export default function Inward() {
                         { key: 'category', header: 'Category' },
                         { key: 'quantity', header: 'Quantity' },
                         { key: 'unit', header: 'Unit' },
-                        ...(user?.role === 'admin' ? [
+                        ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
                           { key: 'rate', header: 'Rate' },
                           { key: 'amount', header: 'Amount' },
                           { key: 'detCharges', header: 'Det Charges' },
@@ -598,9 +659,11 @@ export default function Inward() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
-              <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Create Inward Entry</span>
-            </button>
+            {user?.role !== 'admin' && (
+              <button onClick={() => setIsModalOpen(true)} className="btn-primary flex-none justify-center px-4">
+                <Plus className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Create Inward Entry</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -615,7 +678,7 @@ export default function Inward() {
           <p className="text-sm text-muted-foreground">Total Quantity</p>
           <p className="text-xl md:text-2xl font-bold text-foreground mt-1">{stats.totalQuantity.toFixed(1)}</p>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Invoiced Amount</p>
@@ -647,9 +710,11 @@ export default function Inward() {
             <h2 className="text-xl font-semibold text-foreground">Inward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments</p>
           </div>
-          <Button onClick={() => setIsMaterialModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Material Record
-          </Button>
+          {user?.role !== 'admin' && (
+            <Button onClick={() => setIsMaterialModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" /> Add Material Record
+            </Button>
+          )}
         </div>
 
         <DataTable
@@ -663,7 +728,7 @@ export default function Inward() {
             { key: "wasteName", header: "Waste Name", render: (m: InwardMaterial) => m.wasteName || '-' },
             { key: "category", header: "Category", render: (m: InwardMaterial) => m.category || '-' },
             { key: "quantity", header: "Quantity", render: (m: InwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
-            ...(user?.role === 'admin' ? [
+            ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
               { key: "rate", header: "Rate", render: (m: InwardMaterial) => m.rate ? `₹${Number(m.rate).toFixed(2)}` : '-' },
               { key: "amount", header: "Amount", render: (m: InwardMaterial) => m.amount ? `₹${Number(m.amount).toFixed(2)}` : '-' },
               { key: "detCharges", header: "Det. Charges", render: (m: InwardMaterial) => m.detCharges ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
@@ -677,24 +742,28 @@ export default function Inward() {
               header: "Actions",
               render: (m: InwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setEditingMaterial(m);
-                      setIsMaterialModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteMaterial(m.id)}
-                    disabled={deleteMaterialMutation.isPending}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {user?.role !== 'admin' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingMaterial(m);
+                          setIsMaterialModalOpen(true);
+                        }}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMaterial(m.id)}
+                        disabled={deleteMaterialMutation.isPending}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               ),
             },
@@ -821,6 +890,7 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
     unit: (entry?.unit as "MT" | "Kg" | "KL") || "Kg",
     month: entry?.month || "",
     lotNo: entry?.lotNo || "",
+    remarks: entry?.remarks || "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -848,8 +918,8 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
       return;
     }
 
-    // Validate rate if provided and user is admin
-    if (user?.role === 'admin' && formData.rate && !isPositiveNumber(formData.rate)) {
+    // Validate rate if provided and user is admin or superadmin
+    if (['admin', 'superadmin'].includes(user?.role || '') && formData.rate && !isPositiveNumber(formData.rate)) {
       toast.error("Rate must be a positive number");
       return;
     }
@@ -947,7 +1017,7 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
             <option value="">Select Waste Material</option>
             {companyMaterials.map((m: any) => (
               <option key={m.id} value={m.materialName}>
-                {user?.role === 'admin' ? `${m.materialName} (${m.rate}/${m.unit})` : m.materialName}
+                {['admin', 'superadmin'].includes(user?.role || '') ? `${m.materialName} (${m.rate}/${m.unit})` : m.materialName}
               </option>
             ))}
             {!formData.companyId && <option value="" disabled>Select a company first</option>}
@@ -993,7 +1063,7 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
             <option value="KL">KL</option>
           </select>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Rate</label>
             <input
@@ -1028,6 +1098,16 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
             placeholder="Auto-generated if empty"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1.5">Remarks</label>
+        <textarea
+          className="input-field w-full min-h-[80px] py-2"
+          value={formData.remarks}
+          onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+          placeholder="Any additional notes..."
+        />
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
@@ -1139,7 +1219,7 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
           <p className="text-sm text-muted-foreground">Company</p>
           <p className="font-medium text-foreground">{entry.company?.name || '-'}</p>
         </div>
-        {user?.role === 'admin' && (
+        {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div>
               <p className="text-sm text-muted-foreground">Rate</p>
@@ -1174,12 +1254,70 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
         </div>
       </div>
 
+      {entry.remarks && (
+        <div>
+          <p className="text-sm text-muted-foreground">Remarks</p>
+          <p className="font-medium text-foreground bg-muted/30 p-2 rounded mt-1 text-sm italic whitespace-pre-wrap">
+            {entry.remarks}
+          </p>
+        </div>
+      )}
+
+      {/* Linked Transporter Records */}
+      <div>
+        <h4 className="font-medium text-foreground mb-3">Transporter Records</h4>
+        {entry.inwardMaterials && entry.inwardMaterials.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2 font-semibold">Transporter</th>
+                  <th className="px-4 py-2 font-semibold">Vehicle No</th>
+                  <th className="px-4 py-2 font-semibold text-right">Quantity</th>
+                  {['admin', 'superadmin'].includes(user?.role || '') && (
+                    <>
+                      <th className="px-4 py-2 font-semibold text-right">Rate</th>
+                      <th className="px-4 py-2 font-semibold text-right">Gross Amount</th>
+                      <th className="px-4 py-2 font-semibold">Invoice No</th>
+                      <th className="px-4 py-2 font-semibold">Paid On</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {entry.inwardMaterials.map((mat: any) => (
+                  <tr key={mat.id} className="hover:bg-secondary/20 transition-colors">
+                    <td className="px-4 py-3">{mat.transporterName}</td>
+                    <td className="px-4 py-3">{mat.vehicleNo || '-'}</td>
+                    <td className="px-4 py-3 text-right">{mat.quantity} {mat.unit}</td>
+                    {['admin', 'superadmin'].includes(user?.role || '') && (
+                      <>
+                        <td className="px-4 py-3 text-right">₹{Number(mat.rate || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-medium">₹{Number(mat.grossAmount || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3">{mat.invoiceNo || '-'}</td>
+                        <td className="px-4 py-3">
+                          {mat.paidOn ? format(new Date(mat.paidOn), 'dd MMM yyyy') : <span className="text-destructive font-medium">Pending</span>}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic bg-secondary/20 p-4 rounded-xl text-center">
+            No linked transporter records found for this entry.
+          </p>
+        )}
+      </div>
+
       {
-        entry.invoice && user?.role === 'admin' && (
+        entry.invoice && ['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <hr className="border-border" />
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-foreground">Invoice Details</h4>
+              <h4 className="font-medium text-foreground">Company Invoice Details</h4>
               <Button
                 variant="outline"
                 size="sm"
