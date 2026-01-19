@@ -91,6 +91,7 @@ class OutwardService {
         include: {
           transporter: true,
           invoice: true,
+          outwardMaterials: true,
         },
       }),
       prisma.outwardEntry.count({ where }),
@@ -120,6 +121,7 @@ class OutwardService {
       include: {
         transporter: true,
         invoice: true,
+        outwardMaterials: true,
       },
     });
 
@@ -260,6 +262,7 @@ class OutwardService {
       include: {
         transporter: true,
         invoice: true,
+        outwardMaterials: true,
       },
     });
 
@@ -362,6 +365,7 @@ class OutwardService {
       include: {
         transporter: true,
         invoice: true,
+        outwardMaterials: true,
       },
     });
 

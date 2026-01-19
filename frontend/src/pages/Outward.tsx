@@ -826,7 +826,8 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
   }, [formData.amount, formData.detCharges, formData.gst]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.cementCompany || !formData.manifestNo || !formData.quantity) {
+    const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
+    if (!formData.cementCompany || !formData.manifestNo || !formData.quantity || (isAdmin && !formData.invoiceNo)) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -942,13 +943,14 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {['admin', 'superadmin'].includes(user?.role || '') && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Invoice No.</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Invoice No. *</label>
             <input
               type="text"
               className="input-field w-full"
               value={formData.invoiceNo}
               onChange={(e) => setFormData({ ...formData, invoiceNo: e.target.value })}
-              placeholder="Enter invoice number (optional)"
+              placeholder="Enter invoice number"
+              required
             />
           </div>
         )}
@@ -1191,7 +1193,7 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {entry.outwardMaterials.map((mat: any) => (
+                {entry.outwardMaterials.map((mat: OutwardMaterial) => (
                   <tr key={mat.id} className="hover:bg-secondary/20 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-medium text-foreground">{mat.transporterName}</div>

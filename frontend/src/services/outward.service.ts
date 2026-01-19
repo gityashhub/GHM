@@ -36,6 +36,7 @@ export interface OutwardEntry {
   };
   createdAt: string;
   updatedAt: string;
+  outwardMaterials?: OutwardMaterial[];
 }
 
 export interface CreateOutwardEntryData {
