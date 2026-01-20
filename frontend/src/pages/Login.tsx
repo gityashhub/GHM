@@ -44,7 +44,7 @@ export default function Login() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@chemwaste.com"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -78,15 +78,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-
-          {/* Default Credentials Hint */}
-          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              Default credentials:
-              <br />
-              <span className="font-mono">admin@chemwaste.com / admin123</span>
-            </p>
-          </div>
         </div>
       </div>
     </div>
